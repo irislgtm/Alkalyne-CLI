@@ -1,6 +1,6 @@
 # Binary
-alkalyne
-alkalyne.exe
+/alkalyne
+/alkalyne.exe
 
 # Test artifacts
 *.test
