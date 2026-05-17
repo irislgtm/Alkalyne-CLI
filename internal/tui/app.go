@@ -1138,7 +1138,10 @@ func (m *AppModel) renderMessages() {
 
 	for _, msg := range m.messages {
 		if msg.Sender == "system" {
-			b.WriteString(msgBodyIndent + styleSystemMsg.Render(msg.Text) + "\n\n")
+			for _, line := range wrapText(msg.Text, textW) {
+				b.WriteString(msgBodyIndent + styleSystemMsg.Render(line) + "\n")
+			}
+			b.WriteString("\n")
 			continue
 		}
 
