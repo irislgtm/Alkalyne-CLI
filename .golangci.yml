@@ -1,0 +1,40 @@
+version: "2"
+formatters:
+  enable:
+    - gofmt
+    - goimports
+linters:
+  default: none
+  enable:
+    - govet
+    - errcheck
+    - ineffassign
+    - staticcheck
+    - unused
+    - dupl
+    - gocognit
+    - goconst
+    - prealloc
+    - unconvert
+    - nakedret
+    - predeclared
+    - thelper
+    - gocyclo
+  settings:
+    goconst:
+      min-occurrences: 6
+    gocognit:
+      min-complexity: 35
+    gocyclo:
+      min-complexity: 15
+  exclusions:
+    rules:
+      - linters: [errcheck]
+        text: Close
+      - path: '(.+)_test\.go'
+        linters: [goconst]
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+run:
+  timeout: 5m
