@@ -16,6 +16,11 @@ func (m *AppModel) handleChatKey(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.sendMessage()
 		return m, nil
 	case ":", "/":
+		if m.input.Value() != "" {
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
+		}
 		m.mode = modeCommand
 		if key == "/" {
 			m.cmdBuf = "/"
@@ -29,6 +34,11 @@ func (m *AppModel) handleChatKey(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.renderMessages()
 		return m, nil
 	case "?":
+		if m.input.Value() != "" {
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
+		}
 		m.mode = modeHelp
 		return m, nil
 	case "ctrl+l":

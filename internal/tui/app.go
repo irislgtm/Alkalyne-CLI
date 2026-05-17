@@ -542,6 +542,12 @@ func (m *AppModel) lobbyListenerCmd() tea.Cmd {
 				SenderName: chatMsg.SenderName,
 			}
 		}
+		if chatMsg.Kind == p2p.MsgKindDM {
+			if chatMsg.RecipientID == m.backend.PeerID {
+				m.handleIncomingDM(chatMsg)
+			}
+			return m.lobbyListenerCmd()()
+		}
 		return IncomingMessage{
 			SenderID:   msg.ReceivedFrom.String(),
 			SenderName: chatMsg.SenderName,
@@ -577,6 +583,21 @@ func (m *AppModel) sendMessage() {
 			go func() { _ = m.backend.LobbyTopic.Publish(m.backend.LobbyCtx, data) }()
 		} else if m.dmTopic != nil {
 			go func() { _ = m.dmTopic.Publish(m.dmCtx, data) }()
+			otherPeer := extractOtherPeer(m.activeDMConv, m.backend.PeerID)
+			dmMsg := &p2p.ChatMessage{
+				Kind:        p2p.MsgKindDM,
+				ID:          chatMsg.ID,
+				SenderID:    m.peerID,
+				SenderName:  senderName,
+				RecipientID: otherPeer,
+				Text:        text,
+				TimestampNS: chatMsg.TimestampNS,
+				ConvID:      m.activeDMConv,
+			}
+			dmData, dmErr := p2p.EncodeMessage(dmMsg)
+			if dmErr == nil {
+				go func() { _ = m.backend.LobbyTopic.Publish(m.backend.LobbyCtx, dmData) }()
+			}
 		}
 	}
 
@@ -880,6 +901,21 @@ func shortPeerID(pid string) string {
 	return pid[:8] + ".." + pid[len(pid)-4:]
 }
 
+func extractOtherPeer(topicName, myPeerID string) string {
+	if !strings.HasPrefix(topicName, p2p.DMTopicPrefix) {
+		return ""
+	}
+	rest := strings.TrimPrefix(topicName, p2p.DMTopicPrefix)
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	if parts[0] == myPeerID {
+		return parts[1]
+	}
+	return parts[0]
+}
+
 func (m *AppModel) executeCommand(cmd string) {
 	parts := strings.SplitN(cmd, " ", 2)
 	switch parts[0] {
@@ -992,6 +1028,45 @@ func (m *AppModel) setStyle(parts []string) {
 	delete(peerStyleCache, m.peerID)
 	m.addSystemMsg("style set to " + name)
 	m.loadSidebar()
+}
+
+func (m *AppModel) handleIncomingDM(msg *p2p.ChatMessage) {
+	convID := msg.ConvID
+	if convID == "" {
+		convID = p2p.DMTopicName(m.backend.PeerID, msg.SenderID)
+	}
+
+	if _, ok := m.msgBufs[convID]; !ok {
+		m.msgBufs[convID] = []MessageItem{}
+	}
+
+	if m.dmTopic == nil || m.activeDMConv != convID {
+		_ = m.joinDMTopic(msg.SenderID)
+	}
+
+	sender := msg.SenderName
+	if sender == "" {
+		sender = shortPeerID(msg.SenderID)
+	}
+	item := MessageItem{
+		Sender:    sender,
+		SenderID:  msg.SenderID,
+		Text:      msg.Text,
+		Timestamp: formatTime(msg.TimestampNS),
+		IsSelf:    false,
+		Status:    models.MessageDelivered,
+	}
+	m.msgBufs[convID] = append(m.msgBufs[convID], item)
+
+	if convID == m.convoName || m.activeDMConv == convID {
+		m.messages = m.msgBufs[convID]
+		m.renderMessages()
+	}
+
+	if _, seen := m.lobbyParticipants[msg.SenderID]; !seen {
+		m.lobbyParticipants[msg.SenderID] = sender
+		m.loadSidebar()
+	}
 }
 
 func (m *AppModel) addSystemMsg(text string) {

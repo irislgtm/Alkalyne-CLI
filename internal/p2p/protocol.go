@@ -4,10 +4,10 @@ import "encoding/json"
 
 const DMTopicPrefix = "alkalyne/dm/"
 
-// MsgKindChat and MsgKindPresence distinguish wire message types.
 const (
 	MsgKindChat     = "chat"
 	MsgKindPresence = "presence"
+	MsgKindDM       = "dm"
 )
 
 type ChatMessage struct {
@@ -15,8 +15,10 @@ type ChatMessage struct {
 	ID          string `json:"id"`
 	SenderID    string `json:"sender_id"`
 	SenderName  string `json:"sender_name,omitempty"`
+	RecipientID string `json:"recipient_id,omitempty"`
 	Text        string `json:"text,omitempty"`
 	TimestampNS int64  `json:"timestamp_ns"`
+	ConvID      string `json:"conv_id,omitempty"`
 }
 
 func EncodeMessage(msg *ChatMessage) ([]byte, error) {
