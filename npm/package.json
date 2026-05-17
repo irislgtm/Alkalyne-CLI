@@ -1,0 +1,23 @@
+{
+  "name": "alkalyne",
+  "version": "0.1.0",
+  "description": "Serverless P2P messaging CLI — powered by libp2p",
+  "bin": {
+    "alkalyne": "bin/alkalyne.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "preferUnplugged": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irislgtm/Alkalyne-CLI.git"
+  },
+  "keywords": ["p2p", "messaging", "cli", "libp2p"],
+  "license": "MIT",
+  "files": [
+    "bin/",
+    "install.js",
+    "package.json"
+  ]
+}

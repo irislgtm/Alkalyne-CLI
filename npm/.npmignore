@@ -1,0 +1,11 @@
+internal/
+cmd/
+scripts/
+.golangci.yml
+.gitignore
+*.md
+go.mod
+go.sum
+.github/
+AGENTS.md
+WORKSTREAMS.md

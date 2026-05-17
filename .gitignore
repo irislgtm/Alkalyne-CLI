@@ -22,3 +22,8 @@ Thumbs.db
 # Agent session files
 .session/
 agent-notes/
+
+# npm downloaded Go binaries (not the JS wrappers in bin/)
+npm/alkalyne
+npm/alkalyne.exe
+npm/alkalyne-*
