@@ -944,15 +944,11 @@ func (m *AppModel) executeCommand(cmd string) {
 	case "invite":
 		m.mode = modeInvite
 	case "info":
-		m.addSystemMsg("nickname: " + m.displayName())
-		m.addSystemMsg("peer id: " + m.peerID)
-		for _, addr := range m.backend.Host.Addrs() {
-			m.addSystemMsg("  " + addr.String())
-		}
+		m.execInfo()
 	case "whoami":
-		m.addSystemMsg("nickname: " + m.displayName())
-		m.addSystemMsg("peer id: " + m.peerID)
-		m.addSystemMsg("invite: alkalyne://" + m.peerID)
+		m.execWhoami()
+	case "myaddr":
+		m.execMyAddr()
 	case "register":
 		m.addSystemMsg("alias registration: not yet implemented")
 	case "lookup":
@@ -972,6 +968,28 @@ func (m *AppModel) executeCommand(cmd string) {
 		m.setStyle(parts)
 	}
 	m.renderMessages()
+}
+
+func (m *AppModel) execInfo() {
+	m.addSystemMsg("nickname: " + m.displayName())
+	m.addSystemMsg("peer id: " + m.peerID)
+	for _, addr := range m.backend.Host.Addrs() {
+		m.addSystemMsg("  " + addr.String())
+	}
+}
+
+func (m *AppModel) execWhoami() {
+	m.addSystemMsg("nickname: " + m.displayName())
+	m.addSystemMsg("peer id: " + m.peerID)
+	m.addSystemMsg("invite: alkalyne://" + m.peerID)
+}
+
+func (m *AppModel) execMyAddr() {
+	m.addSystemMsg("nickname: " + m.displayName())
+	m.addSystemMsg("peer id: " + m.peerID)
+	for _, addr := range m.backend.Host.Addrs() {
+		m.addSystemMsg("  " + addr.String() + "/p2p/" + m.peerID)
+	}
 }
 
 func (m *AppModel) addContact(parts []string) {
@@ -1110,7 +1128,7 @@ func (m *AppModel) addSystemMsg(text string) {
 }
 
 var allCommands = []string{
-	"add ", "invite", "info", "whoami",
+	"add ", "invite", "info", "whoami", "myaddr",
 	"register ", "lookup ",
 	"relay", "relay-setup", "relay-list", "relay-add ", "relay-remove ",
 	"color ", "style ",

@@ -18,6 +18,7 @@ import (
 func main() {
 	dataDir := flag.String("data-dir", "", "data directory (default: ~/.alkalyne)")
 	port := flag.Int("port", 9000, "listen port")
+	relayMode := flag.Bool("relay", false, "act as a circuit relay for other peers")
 	noTUI := flag.Bool("no-tui", false, "disable TUI (pipe-friendly mode)")
 	help := flag.Bool("help", false, "print usage")
 	flag.Parse()
@@ -65,7 +66,7 @@ func main() {
 
 	switch mode {
 	case "client":
-		runClient(cfg, cfgFile, *noTUI)
+		runClient(cfg, cfgFile, *noTUI, *relayMode)
 
 	case "daemon":
 		fmt.Println("daemon mode not yet implemented")
@@ -77,7 +78,7 @@ func main() {
 	}
 }
 
-func runClient(cfg *models.Config, cfgPath string, noTUI bool) {
+func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 	dataDir := config.DataDir(cfg)
 	identityPath := p2p.IdentityPath(dataDir)
 	privKey, err := p2p.LoadOrCreateIdentity(identityPath)
@@ -90,13 +91,20 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool) {
 		log.Fatalf("peer id: %v", err)
 	}
 
-	h, err := p2p.NewHost(privKey, cfg.ListenAddrs)
+	h, err := p2p.NewHost(privKey, cfg.ListenAddrs, relayMode)
 	if err != nil {
 		log.Fatalf("p2p host: %v", err)
 	}
 	defer func() { _ = h.Close() }()
 
 	ctx := context.Background()
+
+	if len(cfg.BootstrapPeers) > 0 {
+		errs := p2p.ConnectToPeers(ctx, h, cfg.BootstrapPeers)
+		for _, e := range errs {
+			log.Printf("bootstrap: %v", e)
+		}
+	}
 
 	ps, err := p2p.NewPubSub(ctx, h)
 	if err != nil {
@@ -154,6 +162,7 @@ Usage:
 Flags:
   --data-dir <path>  Data directory (default: ~/.alkalyne)
   --port <n>         Listen port (default: 9000)
+  --relay            Act as a circuit relay for other peers
   --no-tui           Disable TUI, print to stdout
   --help             Print this help`)
 }
