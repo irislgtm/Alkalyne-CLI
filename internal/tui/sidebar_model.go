@@ -38,7 +38,9 @@ func (m *AppModel) handleSidebarKey(key string) (tea.Model, tea.Cmd) {
 				m.addSystemMsg("dm join: " + err.Error())
 				return m, nil
 			}
-			m.switchConversation(sel.name, convoDM)
+			// Use topic name as the conversation key so it matches MsgKindDM relay
+			m.tryDialPeer(sel.peerID)
+			m.switchConversation(m.activeDMConv, convoDM)
 		}
 		return m, m.allListenerCmds()
 	}

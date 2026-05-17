@@ -18,6 +18,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const keyEnter = "enter"
@@ -66,6 +67,15 @@ type MessageItem struct {
 
 // IncomingMessage is the Bubble Tea Msg fired when a chat message arrives.
 type IncomingMessage struct {
+	SenderID   string
+	SenderName string
+	Text       string
+	Time       time.Time
+	ConvID     string
+}
+
+// incomingDMMsg is fired when a DM arrives via the lobby relay.
+type incomingDMMsg struct {
 	SenderID   string
 	SenderName string
 	Text       string
@@ -211,6 +221,10 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case IncomingMessage:
 		m.addIncoming(msg)
+		return m, m.allListenerCmds()
+
+	case incomingDMMsg:
+		m.handleIncomingDM(msg)
 		return m, m.allListenerCmds()
 
 	case presenceMsg:
@@ -543,10 +557,16 @@ func (m *AppModel) lobbyListenerCmd() tea.Cmd {
 			}
 		}
 		if chatMsg.Kind == p2p.MsgKindDM {
-			if chatMsg.RecipientID == m.backend.PeerID {
-				m.handleIncomingDM(chatMsg)
+			if chatMsg.RecipientID != m.backend.PeerID {
+				return m.lobbyListenerCmd()()
 			}
-			return m.lobbyListenerCmd()()
+			return incomingDMMsg{
+				SenderID:   msg.ReceivedFrom.String(),
+				SenderName: chatMsg.SenderName,
+				Text:       chatMsg.Text,
+				Time:       time.Unix(0, chatMsg.TimestampNS),
+				ConvID:     chatMsg.ConvID,
+			}
 		}
 		return IncomingMessage{
 			SenderID:   msg.ReceivedFrom.String(),
@@ -1030,7 +1050,7 @@ func (m *AppModel) setStyle(parts []string) {
 	m.loadSidebar()
 }
 
-func (m *AppModel) handleIncomingDM(msg *p2p.ChatMessage) {
+func (m *AppModel) handleIncomingDM(msg incomingDMMsg) {
 	convID := msg.ConvID
 	if convID == "" {
 		convID = p2p.DMTopicName(m.backend.PeerID, msg.SenderID)
@@ -1052,7 +1072,7 @@ func (m *AppModel) handleIncomingDM(msg *p2p.ChatMessage) {
 		Sender:    sender,
 		SenderID:  msg.SenderID,
 		Text:      msg.Text,
-		Timestamp: formatTime(msg.TimestampNS),
+		Timestamp: formatTime(msg.Time.UnixNano()),
 		IsSelf:    false,
 		Status:    models.MessageDelivered,
 	}
@@ -1067,6 +1087,18 @@ func (m *AppModel) handleIncomingDM(msg *p2p.ChatMessage) {
 		m.lobbyParticipants[msg.SenderID] = sender
 		m.loadSidebar()
 	}
+}
+
+func (m *AppModel) tryDialPeer(peerID string) {
+	pid, err := peer.Decode(peerID)
+	if err != nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = m.backend.Host.Connect(ctx, peer.AddrInfo{ID: pid})
+	}()
 }
 
 func (m *AppModel) addSystemMsg(text string) {
