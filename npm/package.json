@@ -1,6 +1,6 @@
 {
   "name": "alkalyne",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Serverless P2P messaging CLI — powered by libp2p",
   "bin": {
     "alkalyne": "bin/alkalyne.js"
