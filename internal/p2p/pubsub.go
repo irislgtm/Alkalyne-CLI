@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
 )
 
@@ -12,6 +13,14 @@ const LobbyTopic = "alkalyne/lobby"
 
 func NewPubSub(ctx context.Context, h host.Host) (*pubsub.PubSub, error) {
 	ps, err := pubsub.NewGossipSub(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("p2p: new pubsub: %w", err)
+	}
+	return ps, nil
+}
+
+func NewPubSubWithDiscovery(ctx context.Context, h host.Host, disc discovery.Discovery, discOpts ...pubsub.DiscoverOpt) (*pubsub.PubSub, error) {
+	ps, err := pubsub.NewGossipSub(ctx, h, pubsub.WithDiscovery(disc, discOpts...))
 	if err != nil {
 		return nil, fmt.Errorf("p2p: new pubsub: %w", err)
 	}

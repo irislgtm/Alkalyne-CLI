@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -37,6 +38,21 @@ func NewHost(privKey crypto.PrivKey, listenAddrs []string, enableRelay bool) (ho
 	}
 
 	return h, nil
+}
+
+func SetupDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
+	d, err := dht.New(ctx, h, dht.Mode(dht.ModeAuto))
+	if err != nil {
+		return nil, fmt.Errorf("p2p: create dht: %w", err)
+	}
+	return d, nil
+}
+
+func BootstrapDHT(ctx context.Context, dht *dht.IpfsDHT) error {
+	if err := dht.Bootstrap(ctx); err != nil {
+		return fmt.Errorf("p2p: bootstrap dht: %w", err)
+	}
+	return nil
 }
 
 func ConnectToPeers(ctx context.Context, h host.Host, addrs []string) []error {

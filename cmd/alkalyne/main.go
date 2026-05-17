@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/alkalyne/alkalyne/internal/config"
 	"github.com/alkalyne/alkalyne/internal/db"
 	"github.com/alkalyne/alkalyne/internal/models"
 	"github.com/alkalyne/alkalyne/internal/p2p"
 	"github.com/alkalyne/alkalyne/internal/tui"
+	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 )
 
 func main() {
@@ -97,16 +100,36 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 	}
 	defer func() { _ = h.Close() }()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		cancel()
+	}()
 
 	if len(cfg.BootstrapPeers) > 0 {
+		log.Printf("connecting to %d bootstrap peers...", len(cfg.BootstrapPeers))
 		errs := p2p.ConnectToPeers(ctx, h, cfg.BootstrapPeers)
 		for _, e := range errs {
 			log.Printf("bootstrap: %v", e)
 		}
 	}
 
-	ps, err := p2p.NewPubSub(ctx, h)
+	dhtInstance, err := p2p.SetupDHT(ctx, h)
+	if err != nil {
+		log.Fatalf("dht: %v", err)
+	}
+	defer func() { _ = dhtInstance.Close() }()
+
+	if err := p2p.BootstrapDHT(ctx, dhtInstance); err != nil {
+		log.Printf("dht bootstrap: %v", err)
+	}
+
+	disc := routing.NewRoutingDiscovery(dhtInstance)
+	ps, err := p2p.NewPubSubWithDiscovery(ctx, h, disc)
 	if err != nil {
 		log.Fatalf("pubsub: %v", err)
 	}
@@ -116,11 +139,11 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 		log.Fatalf("lobby: %v", err)
 	}
 
-	disc := p2p.NewDiscovery(h)
-	if err := disc.Start(); err != nil {
-		log.Printf("discovery: %v", err)
+	mDNS := p2p.NewDiscovery(h)
+	if err := mDNS.Start(); err != nil {
+		log.Printf("mdns: %v", err)
 	}
-	defer func() { _ = disc.Close() }()
+	defer func() { _ = mDNS.Close() }()
 
 	dbPath := filepath.Join(dataDir, "alkalyne.db")
 	database, err := db.Open(dbPath)

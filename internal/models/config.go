@@ -58,13 +58,18 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		DataDir:        "~/.alkalyne",
-		ListenAddrs:    []string{"/ip4/0.0.0.0/tcp/9000", "/ip4/0.0.0.0/udp/9000/quic-v1"},
-		BootstrapPeers: []string{},
-		DHTEnabled:     false,
-		Nickname:       "",
-		ProfileStyle:   DefaultProfileStyle(),
-		Relays:         map[string]RelayConfig{},
-		Theme:          DefaultTheme(),
+		DataDir:     "~/.alkalyne",
+		ListenAddrs: []string{"/ip4/0.0.0.0/tcp/9000", "/ip4/0.0.0.0/udp/9000/quic-v1"},
+		BootstrapPeers: []string{
+			"/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWkUEDwLoLC1vLf9Q2a9c4N1p",
+			"/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19AuLT",
+			"/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9tKAnLJ1ZQRgGQr3dX5iP",
+			"/dnsaddr/bootstrap.libp2p.io/p2p/QmcgP2Nc4T6L9C6x2W5LpJ5zBqN6Hm3VPRZKq3fJbcXK3K",
+		},
+		DHTEnabled:   true,
+		Nickname:     "",
+		ProfileStyle: DefaultProfileStyle(),
+		Relays:       map[string]RelayConfig{},
+		Theme:        DefaultTheme(),
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 )
 
 type Discovery struct {
