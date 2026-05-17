@@ -3,6 +3,7 @@ package p2p
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -56,6 +57,9 @@ func TestLoadExistingIdentity(t *testing.T) {
 }
 
 func TestIdentityFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permissions are Unix-specific")
+	}
 	dir := t.TempDir()
 	keyPath := filepath.Join(dir, identityFileName)
 
@@ -76,7 +80,7 @@ func TestIdentityFilePermissions(t *testing.T) {
 
 func TestIdentityPath(t *testing.T) {
 	path := IdentityPath("/tmp/alkalyne")
-	expected := "/tmp/alkalyne/identity.key"
+	expected := filepath.Join("/tmp/alkalyne", identityFileName)
 	if path != expected {
 		t.Errorf("expected %s, got %s", expected, path)
 	}
