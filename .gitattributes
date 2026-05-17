@@ -1,0 +1,11 @@
+# Go source — LF line endings always
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Shell scripts — LF
+*.sh text eol=lf
+
+# Binary files
+*.key binary
+*.exe binary
