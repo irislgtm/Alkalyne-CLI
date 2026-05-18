@@ -76,8 +76,7 @@ func main() {
 		runDaemon(cfg)
 
 	case "relay-setup":
-		fmt.Println("relay-setup mode not yet implemented")
-		os.Exit(0)
+		runRelaySetup()
 	}
 }
 
