@@ -16,6 +16,7 @@ import (
 	"github.com/alkalyne/alkalyne/internal/models"
 	"github.com/alkalyne/alkalyne/internal/p2p"
 	"github.com/alkalyne/alkalyne/internal/tui"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 )
 
@@ -117,7 +118,7 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 		}
 	}
 
-	dhtInstance, err := p2p.SetupDHT(ctx, h)
+	dhtInstance, err := p2p.SetupDHT(ctx, h, dht.ModeClient)
 	if err != nil {
 		log.Fatalf("dht: %v", err)
 	}
@@ -166,6 +167,7 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 		PeerID:     peerID,
 		Config:     cfg,
 		ConfigPath: cfgPath,
+		Routing:    dhtInstance,
 	}
 
 	if err := tui.Start(be); err != nil {
@@ -216,7 +218,7 @@ func runDaemon(cfg *models.Config) {
 
 	if cfg.DHTEnabled {
 		log.Print("initializing DHT...")
-		dhtInstance, err := p2p.SetupDHT(ctx, h)
+		dhtInstance, err := p2p.SetupDHT(ctx, h, dht.ModeServer)
 		if err != nil {
 			log.Printf("dht: %v", err)
 		} else {

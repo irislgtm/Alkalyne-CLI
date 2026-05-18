@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 )
 
@@ -40,8 +41,8 @@ func NewHost(privKey crypto.PrivKey, listenAddrs []string, enableRelay bool) (ho
 	return h, nil
 }
 
-func SetupDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
-	d, err := dht.New(ctx, h, dht.Mode(dht.ModeAuto))
+func SetupDHT(ctx context.Context, h host.Host, mode dht.ModeOpt) (*dht.IpfsDHT, error) {
+	d, err := dht.New(ctx, h, dht.Mode(mode))
 	if err != nil {
 		return nil, fmt.Errorf("p2p: create dht: %w", err)
 	}
@@ -53,6 +54,17 @@ func BootstrapDHT(ctx context.Context, dht *dht.IpfsDHT) error {
 		return fmt.Errorf("p2p: bootstrap dht: %w", err)
 	}
 	return nil
+}
+
+func FindPeer(ctx context.Context, r routing.PeerRouting, pid peer.ID) (*peer.AddrInfo, error) {
+	addrInfo, err := r.FindPeer(ctx, pid)
+	if err != nil {
+		return nil, fmt.Errorf("p2p: find peer %s: %w", pid, err)
+	}
+	if len(addrInfo.Addrs) == 0 {
+		return nil, fmt.Errorf("p2p: peer %s has no known addresses", pid)
+	}
+	return &addrInfo, nil
 }
 
 func ConnectToPeers(ctx context.Context, h host.Host, addrs []string) []error {

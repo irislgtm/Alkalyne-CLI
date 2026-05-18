@@ -19,6 +19,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 )
 
 const keyEnter = "enter"
@@ -105,6 +106,7 @@ type Backend struct {
 	PeerID     string
 	Config     *models.Config
 	ConfigPath string
+	Routing    routing.PeerRouting
 }
 
 // AppModel is the root Bubble Tea model.
@@ -958,6 +960,22 @@ func (m *AppModel) executeCommand(cmd string) {
 		m.execWhoami()
 	case "myaddr":
 		m.execMyAddr()
+	case "register", "lookup", "relay", "relay-list", "relay-setup":
+		m.execStubCmd(parts[0])
+	case "search":
+		m.execSearch(parts)
+	case "connect":
+		m.execConnect(parts)
+	case "color":
+		m.setColor(parts)
+	case "style":
+		m.setStyle(parts)
+	}
+	m.renderMessages()
+}
+
+func (m *AppModel) execStubCmd(cmd string) {
+	switch cmd {
 	case "register":
 		m.addSystemMsg("alias registration: not yet implemented")
 	case "lookup":
@@ -970,15 +988,8 @@ func (m *AppModel) executeCommand(cmd string) {
 			m.addSystemMsg("  " + name)
 		}
 	case "relay-setup":
-		m.addSystemMsg("relay setup wizard: not yet implemented")
-	case "search":
-		m.execSearch(parts)
-	case "color":
-		m.setColor(parts)
-	case "style":
-		m.setStyle(parts)
+		m.addSystemMsg("relay setup: run `alkalyne relay-setup` from your terminal")
 	}
-	m.renderMessages()
 }
 
 func (m *AppModel) execInfo() {
@@ -1043,6 +1054,29 @@ func (m *AppModel) rebuildMessagesFromBuf() {
 	}
 }
 
+func (m *AppModel) execConnect(parts []string) {
+	if len(parts) < 2 {
+		m.addSystemMsg("usage: :connect <multiaddr>")
+		m.addSystemMsg("  e.g. :connect /ip4/1.2.3.4/tcp/9000/p2p/QmPeerID")
+		return
+	}
+	addr := strings.TrimPrefix(parts[1], "alkalyne://")
+	pi, err := peer.AddrInfoFromString(addr)
+	if err != nil {
+		m.addSystemMsg("connect: parse: " + err.Error())
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := m.backend.Host.Connect(ctx, *pi); err != nil {
+			m.addSystemMsg("connect: " + err.Error())
+			return
+		}
+		m.addSystemMsg("connected to " + shortPeerID(pi.ID.String()))
+	}()
+}
+
 func (m *AppModel) addContact(parts []string) {
 	if len(parts) < 2 {
 		return
@@ -1055,6 +1089,7 @@ func (m *AppModel) addContact(parts []string) {
 	}
 	m.loadSidebar()
 	m.addSystemMsg("added contact: " + shortPeerID(target))
+	m.tryDialPeer(target)
 }
 
 func (m *AppModel) setColor(parts []string) {
@@ -1161,12 +1196,27 @@ func (m *AppModel) handleIncomingDM(msg incomingDMMsg) {
 func (m *AppModel) tryDialPeer(peerID string) {
 	pid, err := peer.Decode(peerID)
 	if err != nil {
+		m.addSystemMsg("connect: invalid peer ID: " + err.Error())
 		return
 	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = m.backend.Host.Connect(ctx, peer.AddrInfo{ID: pid})
+
+		if m.backend.Routing != nil {
+			addrInfo, err := p2p.FindPeer(ctx, m.backend.Routing, pid)
+			if err != nil {
+				m.addSystemMsg("connect: lookup " + shortPeerID(peerID) + ": " + err.Error())
+				return
+			}
+			if err := m.backend.Host.Connect(ctx, *addrInfo); err != nil {
+				m.addSystemMsg("connect: " + shortPeerID(peerID) + ": " + err.Error())
+				return
+			}
+			m.addSystemMsg("connected to " + shortPeerID(peerID))
+		} else {
+			_ = m.backend.Host.Connect(ctx, peer.AddrInfo{ID: pid})
+		}
 	}()
 }
 
@@ -1179,7 +1229,7 @@ func (m *AppModel) addSystemMsg(text string) {
 }
 
 var allCommands = []string{
-	"add ", "invite", "info", "whoami", "myaddr",
+	"add ", "connect ", "invite", "info", "whoami", "myaddr",
 	"search ",
 	"register ", "lookup ",
 	"relay", "relay-setup", "relay-list", "relay-add ", "relay-remove ",
