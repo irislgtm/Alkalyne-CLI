@@ -8,7 +8,7 @@ import (
 
 func (m *AppModel) handleSidebarKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
-	case "tab", "ctrl+b", "esc":
+	case "tab", "ctrl+b", keyEsc:
 		m.mode = modeChat
 		return m, nil
 	case "up":

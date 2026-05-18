@@ -22,6 +22,7 @@ import (
 )
 
 const keyEnter = "enter"
+const keyEsc = "esc"
 
 // msgBodyIndent is the indent applied to wrapped message body lines.
 const msgBodyIndent = "   "
@@ -132,6 +133,8 @@ type AppModel struct {
 	cmdSel     int
 
 	inviteCopied bool
+
+	searchQuery string
 
 	addInput textinput.Model
 
@@ -289,7 +292,7 @@ func (m *AppModel) handleAddContactKey(key string, msg tea.KeyMsg) (tea.Model, t
 		m.recalcLayout()
 		m.renderMessages()
 		return m, nil
-	case "esc":
+	case keyEsc:
 		m.mode = modeChat
 		m.input.Focus()
 		m.recalcLayout()
@@ -330,7 +333,7 @@ func (m *AppModel) handleNicknameKey(key string, msg tea.KeyMsg) (tea.Model, tea
 		m.input.SetValue("")
 		m.mode = modeChat
 		return m, nil
-	case "esc":
+	case keyEsc:
 		m.input.Placeholder = "message"
 		m.input.SetValue("")
 		m.mode = modeChat
@@ -351,7 +354,7 @@ func (m *AppModel) handleInviteKey(key string) (tea.Model, tea.Cmd) {
 		m.addSystemMsg("invite link copied to clipboard")
 		m.mode = modeChat
 		return m, nil
-	case "esc", "enter":
+	case keyEsc, keyEnter:
 		m.mode = modeChat
 		return m, nil
 	}
@@ -462,7 +465,11 @@ func (m *AppModel) renderSidebarLines(sw int, height int) []string {
 func (m *AppModel) renderBodyLines(bodyW int) []string {
 	var lines []string
 
-	lines = append(lines, styleHeader.Render(m.convoName))
+	header := m.convoName
+	if m.searchQuery != "" {
+		header += styleCmdInput.Render("  search: \"" + m.searchQuery + "\"")
+	}
+	lines = append(lines, styleHeader.Render(header))
 	lines = append(lines, styleDivider.Render(strings.Repeat("\u2500", clampWidth(bodyW))))
 
 	vpView := m.chatVP.View()
@@ -782,6 +789,7 @@ func (m *AppModel) switchConversation(name string, kind convoKind) {
 	m.saveActiveMessages()
 	m.convoName = name
 	m.convoKind = kind
+	m.searchQuery = ""
 	if buf, ok := m.msgBufs[name]; ok {
 		m.messages = buf
 	} else {
@@ -962,6 +970,8 @@ func (m *AppModel) executeCommand(cmd string) {
 		}
 	case "relay-setup":
 		m.addSystemMsg("relay setup wizard: not yet implemented")
+	case "search":
+		m.execSearch(parts)
 	case "color":
 		m.setColor(parts)
 	case "style":
@@ -989,6 +999,46 @@ func (m *AppModel) execMyAddr() {
 	m.addSystemMsg("peer id: " + m.peerID)
 	for _, addr := range m.backend.Host.Addrs() {
 		m.addSystemMsg("  " + addr.String() + "/p2p/" + m.peerID)
+	}
+}
+
+func (m *AppModel) execSearch(parts []string) {
+	if len(parts) < 2 || strings.TrimSpace(parts[1]) == "" {
+		if m.searchQuery != "" {
+			m.searchQuery = ""
+			m.rebuildMessagesFromBuf()
+			m.addSystemMsg("search cleared")
+		} else {
+			m.addSystemMsg("usage: :search <query>")
+		}
+		return
+	}
+	m.searchQuery = strings.TrimSpace(parts[1])
+	m.rebuildMessagesFromBuf()
+	_, count := m.filteredMessages()
+	m.addSystemMsg(fmt.Sprintf("searching for \"%s\" (%d match(es))", m.searchQuery, count))
+}
+
+func (m *AppModel) filteredMessages() ([]MessageItem, int) {
+	if m.searchQuery == "" {
+		return m.messages, len(m.messages)
+	}
+	q := strings.ToLower(m.searchQuery)
+	filtered := make([]MessageItem, 0, len(m.messages))
+	for _, msg := range m.messages {
+		if strings.Contains(strings.ToLower(msg.Text), q) {
+			filtered = append(filtered, msg)
+		}
+	}
+	return filtered, len(filtered)
+}
+
+func (m *AppModel) rebuildMessagesFromBuf() {
+	if buf, ok := m.msgBufs[m.activeDMConv]; ok {
+		m.messages = make([]MessageItem, len(buf))
+		copy(m.messages, buf)
+	} else {
+		m.messages = nil
 	}
 }
 
@@ -1129,6 +1179,7 @@ func (m *AppModel) addSystemMsg(text string) {
 
 var allCommands = []string{
 	"add ", "invite", "info", "whoami", "myaddr",
+	"search ",
 	"register ", "lookup ",
 	"relay", "relay-setup", "relay-list", "relay-add ", "relay-remove ",
 	"color ", "style ",
@@ -1149,7 +1200,7 @@ func (m *AppModel) updateCmdMatches() {
 
 func (m *AppModel) handleCommandKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
-	case "esc":
+	case keyEsc:
 		m.mode = modeChat
 		m.recalcLayout()
 		m.renderMessages()
@@ -1261,7 +1312,9 @@ func (m *AppModel) renderMessages() {
 		textW = 10
 	}
 
-	for _, msg := range m.messages {
+	msgs, _ := m.filteredMessages()
+
+	for _, msg := range msgs {
 		if msg.Sender == "system" {
 			for _, line := range wrapText(msg.Text, textW) {
 				b.WriteString(msgBodyIndent + styleSystemMsg.Render(line) + "\n")

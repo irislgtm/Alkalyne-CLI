@@ -15,24 +15,10 @@ func (m *AppModel) handleChatKey(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "ctrl+e", keyEnter:
 		m.sendMessage()
 		return m, nil
+	case keyEsc:
+		return m.handleEscInChat()
 	case ":", "/":
-		if m.input.Value() != "" {
-			var cmd tea.Cmd
-			m.input, cmd = m.input.Update(msg)
-			return m, cmd
-		}
-		m.mode = modeCommand
-		if key == "/" {
-			m.cmdBuf = "/"
-		} else {
-			m.cmdBuf = ""
-		}
-		m.cmdIdx = len(m.cmdHistory)
-		m.cmdSel = 0
-		m.updateCmdMatches()
-		m.recalcLayout()
-		m.renderMessages()
-		return m, nil
+		return m.handleCmdTrigger(key, msg)
 	case "?":
 		if m.input.Value() != "" {
 			var cmd tea.Cmd
@@ -62,4 +48,33 @@ func (m *AppModel) handleChatKey(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		return m, cmd
 	}
+}
+
+func (m *AppModel) handleEscInChat() (tea.Model, tea.Cmd) {
+	if m.searchQuery != "" {
+		m.searchQuery = ""
+		m.rebuildMessagesFromBuf()
+		m.renderMessages()
+	}
+	return m, nil
+}
+
+func (m *AppModel) handleCmdTrigger(key string, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.input.Value() != "" {
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
+	}
+	m.mode = modeCommand
+	if key == "/" {
+		m.cmdBuf = "/"
+	} else {
+		m.cmdBuf = ""
+	}
+	m.cmdIdx = len(m.cmdHistory)
+	m.cmdSel = 0
+	m.updateCmdMatches()
+	m.recalcLayout()
+	m.renderMessages()
+	return m, nil
 }
