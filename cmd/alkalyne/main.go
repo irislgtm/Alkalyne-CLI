@@ -12,6 +12,7 @@ import (
 
 	"github.com/alkalyne/alkalyne/internal/config"
 	"github.com/alkalyne/alkalyne/internal/db"
+	"github.com/alkalyne/alkalyne/internal/mailbox"
 	"github.com/alkalyne/alkalyne/internal/models"
 	"github.com/alkalyne/alkalyne/internal/p2p"
 	"github.com/alkalyne/alkalyne/internal/tui"
@@ -72,8 +73,7 @@ func main() {
 		runClient(cfg, cfgFile, *noTUI, *relayMode)
 
 	case "daemon":
-		fmt.Println("daemon mode not yet implemented")
-		os.Exit(0)
+		runDaemon(cfg)
 
 	case "relay-setup":
 		fmt.Println("relay-setup mode not yet implemented")
@@ -172,6 +172,78 @@ func runClient(cfg *models.Config, cfgPath string, noTUI bool, relayMode bool) {
 	if err := tui.Start(be); err != nil {
 		log.Fatalf("tui: %v", err)
 	}
+}
+
+func runDaemon(cfg *models.Config) {
+	dataDir := config.DataDir(cfg)
+	identityPath := p2p.IdentityPath(dataDir)
+	privKey, err := p2p.LoadOrCreateIdentity(identityPath)
+	if err != nil {
+		log.Fatalf("identity: %v", err)
+	}
+
+	peerID, err := p2p.PeerIDFromPrivateKey(privKey)
+	if err != nil {
+		log.Fatalf("peer id: %v", err)
+	}
+
+	// daemon always acts as a circuit relay and mailbox relay
+	h, err := p2p.NewHost(privKey, cfg.ListenAddrs, true)
+	if err != nil {
+		log.Fatalf("p2p host: %v", err)
+	}
+	defer func() { _ = h.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	peerIDStr := peerID
+	log.Printf("alkalyne daemon starting (peer: %s)", peerIDStr)
+	log.Printf("listening on: %v", h.Addrs())
+	for _, addr := range h.Addrs() {
+		log.Printf("  %s/p2p/%s", addr, peerIDStr)
+	}
+
+	if len(cfg.BootstrapPeers) > 0 {
+		log.Printf("connecting to %d bootstrap peers...", len(cfg.BootstrapPeers))
+		errs := p2p.ConnectToPeers(ctx, h, cfg.BootstrapPeers)
+		for _, e := range errs {
+			log.Printf("bootstrap: %v", e)
+		}
+	}
+
+	if cfg.DHTEnabled {
+		log.Print("initializing DHT...")
+		dhtInstance, err := p2p.SetupDHT(ctx, h)
+		if err != nil {
+			log.Printf("dht: %v", err)
+		} else {
+			defer func() { _ = dhtInstance.Close() }()
+			if err := p2p.BootstrapDHT(ctx, dhtInstance); err != nil {
+				log.Printf("dht bootstrap: %v", err)
+			}
+		}
+	}
+
+	mDNS := p2p.NewDiscovery(h)
+	if err := mDNS.Start(); err != nil {
+		log.Printf("mdns: %v", err)
+	}
+	defer func() { _ = mDNS.Close() }()
+
+	mbStore := mailbox.NewStore()
+	mbRelay := mailbox.NewRelay(h, mbStore)
+	if err := mbRelay.Start(); err != nil {
+		log.Fatalf("mailbox relay: %v", err)
+	}
+	log.Print("mailbox relay ready (protocol: /alkalyne/mailbox/1.0.0)")
+
+	log.Print("daemon running. press Ctrl+C to stop.")
+	<-sigCh
+	log.Print("shutting down...")
 }
 
 func printUsage() {

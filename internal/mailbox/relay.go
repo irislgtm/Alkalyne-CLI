@@ -2,7 +2,6 @@ package mailbox
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -10,6 +9,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 )
+
+type Storer interface {
+	Store(peerID string, payload []byte)
+	Fetch(peerID string) [][]byte
+	ListPending(peerID string) []string
+	Delete(peerID string, messageID string) bool
+}
 
 type Store struct {
 	mu       sync.RWMutex
@@ -62,17 +68,17 @@ func (s *Store) Delete(peerID string, messageID string) bool {
 
 type Relay struct {
 	host  host.Host
-	store *Store
+	store Storer
 }
 
-func NewRelay(h host.Host, store *Store) *Relay {
+func NewRelay(h host.Host, store Storer) *Relay {
 	return &Relay{
 		host:  h,
 		store: store,
 	}
 }
 
-func (r *Relay) Start(ctx context.Context) error {
+func (r *Relay) Start() error {
 	r.host.SetStreamHandler(ProtocolID, r.handleStream)
 	return nil
 }
