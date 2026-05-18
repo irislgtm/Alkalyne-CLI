@@ -32,7 +32,7 @@ func (m *AppModel) handleSidebarKey(key string) (tea.Model, tea.Cmd) {
 		m.mode = modeChat
 		if sel.kind == convoLobby {
 			m.leaveDMTopic()
-			m.switchConversation("#lobby", convoLobby)
+			m.switchConversation(lobbyName, convoLobby)
 		} else {
 			if err := m.joinDMTopic(sel.peerID); err != nil {
 				m.addSystemMsg("dm join: " + err.Error())

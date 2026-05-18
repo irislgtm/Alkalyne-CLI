@@ -23,6 +23,7 @@ import (
 
 const keyEnter = "enter"
 const keyEsc = "esc"
+const lobbyName = "#lobby"
 
 // msgBodyIndent is the indent applied to wrapped message body lines.
 const msgBodyIndent = "   "
@@ -187,13 +188,13 @@ func initialModel(be *Backend) *AppModel {
 		input:             ti,
 		chatVP:            viewport.New(0, 0),
 		peerID:            be.PeerID,
-		convoName:         "#lobby",
+		convoName:         lobbyName,
 		convoKind:         convoLobby,
 		cfg:               be.Config,
 		backend:           be,
 		sidebarSel:        0,
 		cmdHistory:        []string{},
-		msgBufs:           map[string][]MessageItem{"#lobby": {welcome}},
+		msgBufs:           map[string][]MessageItem{lobbyName: {welcome}},
 		messages:          []MessageItem{welcome},
 		lobbyParticipants: map[string]string{},
 		addInput:          ai,
@@ -803,7 +804,7 @@ func (m *AppModel) switchConversation(name string, kind convoKind) {
 func (m *AppModel) addIncoming(msg IncomingMessage) {
 	convID := msg.ConvID
 	if convID == "lobby" {
-		convID = "#lobby"
+		convID = lobbyName
 	}
 	if _, ok := m.msgBufs[convID]; !ok {
 		m.msgBufs[convID] = []MessageItem{}
@@ -828,7 +829,7 @@ func (m *AppModel) addIncoming(msg IncomingMessage) {
 		m.renderMessages()
 	}
 
-	if convID == "#lobby" {
+	if convID == lobbyName {
 		if _, seen := m.lobbyParticipants[msg.SenderID]; !seen {
 			m.lobbyParticipants[msg.SenderID] = sender
 			m.loadSidebar()
@@ -840,7 +841,7 @@ func (m *AppModel) loadSidebar() {
 	m.sidebarItems = []sidebarItem{
 		{
 			kind:  convoLobby,
-			name:  "#lobby",
+			name:  lobbyName,
 			badge: "",
 			glyph: "",
 			isOn:  true,
